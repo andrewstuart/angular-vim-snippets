@@ -6,6 +6,8 @@ import textwrap
 mod_re = re.compile('angular.module\(["\']*(.*?)["\'\),]')
 type_re = re.compile('\.(controller|directive|service|factory|provider|value)\(')
 component_re = re.compile('\.(?:controller|directive|service|factory|provider)\(["\'](.*?)["\']')
+prop_re = re.compile('\.(\w+?)\s*?=')
+params_re = re.compile('\((.*?)\)')
 DEFAULT_NAME = 'appName'
 DEFAULT_TYPE_NAME = 'type'
 DEFAULT_COMPONENT_NAME = 'componentName'
@@ -44,12 +46,28 @@ def get_ng_module(text=bufText()):
     else:
         return DEFAULT_NAME
 
+def add_method_params(snip):
+		buf = vim.current.window.buffer[vim.current.window.cursor[0]:]
+		lines = []
+		for line in buf:
+				params = params_re.findall(line)
+				if len(params) > 0:
+						for param in params[0].split(','):
+								snip += ' * @param {Object} %s' % param.strip()
+						return
+
+def get_next_prop_name(v=vim.current.window.buffer[vim.current.window.cursor[0]:]):
+		for line in v:
+				if '=' in line:
+						return prop_re.findall(line)[0]
+		return 'name'
+
 def injector_phrase(v):
     return '%s = $injector.get(\'%s\')' % (v, v)
 
 def trim_list(p):
     while p[-1] in (',', ';'): p = p[:-1]
-    return '\n'.join(v for v in p.split('\n')
+    return '\n'.join(v for v in p.splitlines()
                      if len(v.strip()) > 0
                      and v.strip() not in (',', ';')
                      and v[:2] != '//')
@@ -66,7 +84,7 @@ def set_injectors(var_list, pre=''):
         }));
         ''')
 
-    injectors = ';\n\t'.join(injector_phrase(v) for v in var_list.split(', '))
+    injectors = ';\n\t'.join(injector_phrase(v) for v in var_list.split(', ')) + ';'
 
     phrase = phrase % (injectors,)
 
@@ -283,7 +301,7 @@ snippet /m "NGDoc Method" !b
 /**
  * @ngdoc
  * @methodOf ${1:`!p snip.rv += get_ng_component_of()`}
- * @name $1#${2:name}
+ * @name $1#${2:`!p snip.rv += get_next_prop_name()`}`!p add_method_params(snip)`
  * @description ${0:\`$2\` is a method to}
  */
 endsnippet
@@ -292,7 +310,7 @@ snippet /p "NGDoc Property" !b
 /**
  * @ngdoc
  * @propertyOf ${1:`!p snip.rv += get_ng_component_of()`}
- * @name $1#${2:name}
+ * @name $1#${2:`!p snip.rv += get_next_prop_name()`}
  * @description ${0:\`$2\` is a property for}
  */
 endsnippet
@@ -355,6 +373,26 @@ describe('${1:something to be tested}', function() {
 	//Tests
 	$0
 });
+endsnippet
+
+snippet hbver "httpBackend verify" !b
+afterEach(function() {
+	$httpBackend.verifyNoOutstandingRequest();
+	$httpBackend.verifyNoOutstandingExpectation();
+});
+endsnippet
+
+snippet hbexp "httpBackend expect" !b
+$httpBackend.expect('${1:GET}', '${2:someRoute}')
+	.respond(${3:someObject});
+endsnippet
+
+snippet befmock "load mock function via module" !b
+beforeEach(module(${1:someMockFunction()}));
+endsnippet
+
+snippet injget "injector get and set closure" !b
+${1:someVar} = $injector.get('$1');
 endsnippet
 
 # vim:ft=snippets:
